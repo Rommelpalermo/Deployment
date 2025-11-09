@@ -124,7 +124,7 @@ include 'includes/header.php';
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover data-table" id="inventoryTable">
+            <table class="table table-hover" id="inventoryTable">
                 <thead>
                     <tr>
                         <th>Item Code</th>

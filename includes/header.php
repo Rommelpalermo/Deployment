@@ -180,6 +180,17 @@
                             </a>
                         </li>
                         
+                        <li class="nav-item">
+                            <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-white-50">
+                                <span>Tools & Utilities</span>
+                            </h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'compatibility.php' ? 'active' : ''; ?>" href="compatibility.php">
+                                <i class="fas fa-microchip"></i> Parts Compatibility
+                            </a>
+                        </li>
+                        
                         <?php if (isAdmin()): ?>
                         <li class="nav-item">
                             <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-white-50">

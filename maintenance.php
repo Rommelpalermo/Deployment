@@ -11,27 +11,24 @@ $page_title = 'Maintenance Schedules';
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] == 'add') {
-        $item_id = (int)$_POST['item_id'];
+        $inventory_id = (int)$_POST['inventory_id'];
         $maintenance_type = $_POST['maintenance_type'];
-        $scheduled_date = $_POST['scheduled_date'];
+        $maintenance_date = $_POST['maintenance_date'];
         $description = sanitize($_POST['description']);
-        $priority = $_POST['priority'];
         
-        if (!empty($item_id) && !empty($maintenance_type) && !empty($scheduled_date)) {
+        if (!empty($inventory_id) && !empty($maintenance_type) && !empty($maintenance_date)) {
             $data = array(
-                'item_id' => $item_id,
+                'inventory_id' => $inventory_id,
                 'maintenance_type' => $maintenance_type,
-                'scheduled_date' => $scheduled_date,
+                'maintenance_date' => $maintenance_date,
                 'description' => $description,
-                'priority' => $priority,
                 'status' => 'scheduled',
-                'created_by' => getCurrentUserId(),
                 'created_at' => date('Y-m-d H:i:s')
             );
             
             try {
                 $db->insert('maintenance_log', $data);
-                logActivity(getCurrentUserId(), 'Maintenance Scheduled', "Scheduled maintenance for item ID: {$item_id}");
+                logActivity(getCurrentUserId(), 'Maintenance Scheduled', "Scheduled maintenance for inventory ID: {$inventory_id}");
                 setFlashMessage('success', 'Maintenance scheduled successfully!');
             } catch (Exception $e) {
                 setFlashMessage('danger', 'Failed to schedule maintenance.');
@@ -46,17 +43,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if (isset($_POST['action']) && $_POST['action'] == 'complete') {
         $id = (int)$_POST['maintenance_id'];
-        $completed_date = $_POST['completed_date'];
+        $maintenance_date = $_POST['maintenance_date'];
         $notes = sanitize($_POST['notes']);
         $cost = !empty($_POST['cost']) ? (float)$_POST['cost'] : null;
+        $technician = sanitize($_POST['technician']);
         
         try {
             $update_data = array(
                 'status' => 'completed',
-                'completed_date' => $completed_date,
-                'notes' => $notes,
+                'maintenance_date' => $maintenance_date,
+                'description' => $notes, // Using description field for notes
                 'cost' => $cost,
-                'completed_by' => getCurrentUserId()
+                'technician' => $technician,
+                'performed_by' => getCurrentUserId()
             );
             $db->update('maintenance_log', $update_data, 'id = ?', array($id));
             logActivity(getCurrentUserId(), 'Maintenance Completed', "Completed maintenance ID: {$id}");
@@ -72,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 // Get filter parameters
 $status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
-$priority_filter = isset($_GET['priority']) ? $_GET['priority'] : 'all';
 
 // Build WHERE clause for filters
 $where_conditions = array();
@@ -81,11 +79,6 @@ $params = array();
 if ($status_filter != 'all') {
     $where_conditions[] = "ml.status = ?";
     $params[] = $status_filter;
-}
-
-if ($priority_filter != 'all') {
-    $where_conditions[] = "ml.priority = ?";
-    $params[] = $priority_filter;
 }
 
 $where_clause = '';
@@ -97,44 +90,43 @@ if (!empty($where_conditions)) {
 $maintenance_records = $db->fetchAll("
     SELECT ml.*, 
            i.name as item_name, i.serial_number,
-           u1.username as created_by_user,
-           u2.username as completed_by_user,
+           u1.username as performed_by_user,
            c.name as category_name
     FROM maintenance_log ml
-    LEFT JOIN inventory i ON ml.item_id = i.id
-    LEFT JOIN users u1 ON ml.created_by = u1.id
-    LEFT JOIN users u2 ON ml.completed_by = u2.id
+    LEFT JOIN inventory i ON ml.inventory_id = i.id
+    LEFT JOIN users u1 ON ml.performed_by = u1.id
     LEFT JOIN categories c ON i.category_id = c.id
     {$where_clause}
     ORDER BY 
-        CASE ml.priority 
-            WHEN 'high' THEN 1 
-            WHEN 'medium' THEN 2 
-            WHEN 'low' THEN 3 
+        CASE ml.status 
+            WHEN 'scheduled' THEN 1 
+            WHEN 'in_progress' THEN 2 
+            WHEN 'completed' THEN 3 
+            WHEN 'cancelled' THEN 4
         END,
-        ml.scheduled_date ASC
+        ml.maintenance_date ASC
 ", $params);
 
 // Get upcoming maintenance (next 30 days)
 $upcoming_maintenance = $db->fetchAll("
     SELECT ml.*, i.name as item_name, c.name as category_name
     FROM maintenance_log ml
-    LEFT JOIN inventory i ON ml.item_id = i.id
+    LEFT JOIN inventory i ON ml.inventory_id = i.id
     LEFT JOIN categories c ON i.category_id = c.id
     WHERE ml.status = 'scheduled' 
-    AND ml.scheduled_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-    ORDER BY ml.scheduled_date ASC
+    AND ml.maintenance_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ORDER BY ml.maintenance_date ASC
 ");
 
 // Get overdue maintenance
 $overdue_maintenance = $db->fetchAll("
     SELECT ml.*, i.name as item_name, c.name as category_name
     FROM maintenance_log ml
-    LEFT JOIN inventory i ON ml.item_id = i.id
+    LEFT JOIN inventory i ON ml.inventory_id = i.id
     LEFT JOIN categories c ON i.category_id = c.id
     WHERE ml.status = 'scheduled' 
-    AND ml.scheduled_date < CURDATE()
-    ORDER BY ml.scheduled_date ASC
+    AND ml.maintenance_date < CURDATE()
+    ORDER BY ml.maintenance_date ASC
 ");
 
 // Get inventory items for dropdown
@@ -202,7 +194,7 @@ include 'includes/header.php';
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <label for="status" class="form-label">Status</label>
                 <select class="form-select" name="status" id="status" onchange="this.form.submit()">
                     <option value="all" <?php echo $status_filter == 'all' ? 'selected' : ''; ?>>All Status</option>
@@ -212,16 +204,7 @@ include 'includes/header.php';
                     <option value="cancelled" <?php echo $status_filter == 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
                 </select>
             </div>
-            <div class="col-md-4">
-                <label for="priority" class="form-label">Priority</label>
-                <select class="form-select" name="priority" id="priority" onchange="this.form.submit()">
-                    <option value="all" <?php echo $priority_filter == 'all' ? 'selected' : ''; ?>>All Priorities</option>
-                    <option value="high" <?php echo $priority_filter == 'high' ? 'selected' : ''; ?>>High</option>
-                    <option value="medium" <?php echo $priority_filter == 'medium' ? 'selected' : ''; ?>>Medium</option>
-                    <option value="low" <?php echo $priority_filter == 'low' ? 'selected' : ''; ?>>Low</option>
-                </select>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
+            <div class="col-md-6 d-flex align-items-end">
                 <a href="maintenance.php" class="btn btn-outline-secondary">Clear Filters</a>
             </div>
         </form>
@@ -240,16 +223,15 @@ include 'includes/header.php';
                     <tr>
                         <th>Item</th>
                         <th>Type</th>
-                        <th>Priority</th>
-                        <th>Scheduled Date</th>
+                        <th>Maintenance Date</th>
                         <th>Status</th>
-                        <th>Created By</th>
+                        <th>Technician</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($maintenance_records as $record): ?>
-                    <tr class="<?php echo $record['scheduled_date'] < date('Y-m-d') && $record['status'] == 'scheduled' ? 'table-warning' : ''; ?>">
+                    <tr class="<?php echo $record['maintenance_date'] < date('Y-m-d') && $record['status'] == 'scheduled' ? 'table-warning' : ''; ?>">
                         <td>
                             <strong><?php echo htmlspecialchars($record['item_name']); ?></strong><br>
                             <small class="text-muted"><?php echo htmlspecialchars($record['serial_number']); ?></small>
@@ -260,25 +242,13 @@ include 'includes/header.php';
                             </span>
                         </td>
                         <td>
-                            <?php 
-                            $priority_colors = array(
-                                'high' => 'danger',
-                                'medium' => 'warning', 
-                                'low' => 'success'
-                            );
-                            ?>
-                            <span class="badge bg-<?php echo $priority_colors[$record['priority']]; ?>">
-                                <?php echo ucfirst($record['priority']); ?>
-                            </span>
-                        </td>
-                        <td>
-                            <?php echo date('M d, Y', strtotime($record['scheduled_date'])); ?>
-                            <?php if ($record['scheduled_date'] < date('Y-m-d') && $record['status'] == 'scheduled'): ?>
+                            <?php echo date('M d, Y', strtotime($record['maintenance_date'])); ?>
+                            <?php if ($record['maintenance_date'] < date('Y-m-d') && $record['status'] == 'scheduled'): ?>
                                 <br><small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Overdue</small>
                             <?php endif; ?>
                         </td>
                         <td><?php echo getStatusBadge($record['status']); ?></td>
-                        <td><?php echo htmlspecialchars($record['created_by_user']); ?></td>
+                        <td><?php echo htmlspecialchars($record['technician'] ?: 'Not assigned'); ?></td>
                         <td>
                             <div class="btn-group" role="group">
                                 <button type="button" class="btn btn-sm btn-outline-info" 
@@ -317,8 +287,8 @@ include 'includes/header.php';
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="item_id" class="form-label">Select Item *</label>
-                                <select class="form-select" id="item_id" name="item_id" required>
+                                <label for="inventory_id" class="form-label">Select Item *</label>
+                                <select class="form-select" id="inventory_id" name="inventory_id" required>
                                     <option value="">Choose an item...</option>
                                     <?php foreach ($inventory_items as $item): ?>
                                     <option value="<?php echo $item['id']; ?>">
@@ -337,30 +307,14 @@ include 'includes/header.php';
                                     <option value="preventive">Preventive</option>
                                     <option value="corrective">Corrective</option>
                                     <option value="emergency">Emergency</option>
-                                    <option value="calibration">Calibration</option>
-                                    <option value="inspection">Inspection</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="scheduled_date" class="form-label">Scheduled Date *</label>
-                                <input type="date" class="form-control" id="scheduled_date" name="scheduled_date" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="priority" class="form-label">Priority *</label>
-                                <select class="form-select" id="priority" name="priority" required>
-                                    <option value="medium">Medium</option>
-                                    <option value="low">Low</option>
-                                    <option value="high">High</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label for="maintenance_date" class="form-label">Maintenance Date *</label>
+                        <input type="date" class="form-control" id="maintenance_date" name="maintenance_date" required>
                     </div>
                     
                     <div class="mb-3">
@@ -391,9 +345,15 @@ include 'includes/header.php';
                 <input type="hidden" name="maintenance_id" id="complete_maintenance_id">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="completed_date" class="form-label">Completion Date *</label>
-                        <input type="date" class="form-control" id="completed_date" name="completed_date" 
+                        <label for="maintenance_date_complete" class="form-label">Maintenance Date *</label>
+                        <input type="date" class="form-control" id="maintenance_date_complete" name="maintenance_date" 
                                value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="technician" class="form-label">Technician</label>
+                        <input type="text" class="form-control" id="technician" name="technician" 
+                               placeholder="Name of technician who performed maintenance">
                     </div>
                     
                     <div class="mb-3">
@@ -402,7 +362,7 @@ include 'includes/header.php';
                     </div>
                     
                     <div class="mb-3">
-                        <label for="notes" class="form-label">Completion Notes</label>
+                        <label for="notes" class="form-label">Maintenance Notes</label>
                         <textarea class="form-control" id="notes" name="notes" rows="4" 
                                   placeholder="Describe the work performed, any issues found, parts replaced, etc."></textarea>
                     </div>
@@ -441,11 +401,6 @@ function completeMaintenance(id) {
 
 function viewMaintenance(record) {
     const details = document.getElementById('maintenanceDetails');
-    const priority_colors = {
-        'high': 'danger',
-        'medium': 'warning', 
-        'low': 'success'
-    };
     
     details.innerHTML = `
         <div class="row">
@@ -458,15 +413,14 @@ function viewMaintenance(record) {
             <div class="col-md-6">
                 <h6>Maintenance Information</h6>
                 <p><strong>Type:</strong> <span class="badge bg-info">${record.maintenance_type.replace('_', ' ')}</span></p>
-                <p><strong>Priority:</strong> <span class="badge bg-${priority_colors[record.priority]}">${record.priority}</span></p>
                 <p><strong>Status:</strong> ${getStatusBadgeHTML(record.status)}</p>
+                ${record.technician ? `<p><strong>Technician:</strong> ${record.technician}</p>` : ''}
             </div>
         </div>
         <div class="row">
             <div class="col-12">
                 <h6>Schedule</h6>
-                <p><strong>Scheduled Date:</strong> ${new Date(record.scheduled_date).toLocaleDateString()}</p>
-                ${record.completed_date ? `<p><strong>Completed Date:</strong> ${new Date(record.completed_date).toLocaleDateString()}</p>` : ''}
+                <p><strong>Maintenance Date:</strong> ${new Date(record.maintenance_date).toLocaleDateString()}</p>
             </div>
         </div>
         ${record.description ? `
@@ -474,13 +428,6 @@ function viewMaintenance(record) {
             <div class="col-12">
                 <h6>Description</h6>
                 <p>${record.description}</p>
-            </div>
-        </div>` : ''}
-        ${record.notes ? `
-        <div class="row">
-            <div class="col-12">
-                <h6>Completion Notes</h6>
-                <p>${record.notes}</p>
             </div>
         </div>` : ''}
         ${record.cost ? `
@@ -491,14 +438,10 @@ function viewMaintenance(record) {
             </div>
         </div>` : ''}
         <div class="row">
-            <div class="col-md-6">
-                <p><strong>Created By:</strong> ${record.created_by_user || 'N/A'}</p>
-                <p><strong>Created Date:</strong> ${new Date(record.created_at).toLocaleDateString()}</p>
+            <div class="col-12">
+                <p><strong>Created:</strong> ${new Date(record.created_at).toLocaleDateString()}</p>
+                ${record.performed_by_user ? `<p><strong>Performed By:</strong> ${record.performed_by_user}</p>` : ''}
             </div>
-            ${record.completed_by_user ? `
-            <div class="col-md-6">
-                <p><strong>Completed By:</strong> ${record.completed_by_user}</p>
-            </div>` : ''}
         </div>
     `;
 }

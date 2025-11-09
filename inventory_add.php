@@ -87,11 +87,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 logActivity(getCurrentUserId(), 'Inventory Item Added', "Added item: {$name} ({$item_code})");
                 
                 setFlashMessage('success', 'Inventory item added successfully!');
-                header('Location: inventory_view.php?id=' . $itemId);
+                header('Location: inventory.php');
                 exit;
                 
             } catch (Exception $e) {
-                $errors[] = 'Failed to add inventory item. Please try again.';
+                error_log("Database error in inventory_add.php: " . $e->getMessage());
+                $errors[] = 'Database error: ' . $e->getMessage();
             }
         }
     }
@@ -127,7 +128,7 @@ include 'includes/header.php';
                     </div>
                 <?php endif; ?>
                 
-                <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
                     
                     <!-- Basic Information -->

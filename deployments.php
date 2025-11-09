@@ -202,7 +202,7 @@ include 'includes/header.php';
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover data-table" id="deploymentsTable">
+            <table class="table table-hover" id="deploymentsTable">
                 <thead>
                     <tr>
                         <th>Deployment Code</th>

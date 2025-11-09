@@ -484,3 +484,158 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--secondary-color);
 }
+
+/* Component Compatibility Checker Specific Styles */
+.compatibility-card {
+    border: 2px solid #e9ecef;
+    transition: border-color 0.3s ease;
+}
+
+.compatibility-card:hover {
+    border-color: #007bff;
+}
+
+.component-icon {
+    font-size: 2rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.compatibility-result.compatible {
+    border-left: 4px solid #28a745;
+    background-color: #d4edda;
+}
+
+.compatibility-result.incompatible {
+    border-left: 4px solid #dc3545;
+    background-color: #f8d7da;
+}
+
+.compatibility-result.warning {
+    border-left: 4px solid #ffc107;
+    background-color: #fff3cd;
+}
+
+.spec-list {
+    font-size: 0.9rem;
+}
+
+.spec-list .spec-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.spec-list .spec-value {
+    color: #6c757d;
+}
+
+/* Socket compatibility indicators */
+.socket-match {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.socket-mismatch {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Power requirement indicators */
+.power-ok {
+    color: #28a745;
+}
+
+.power-warning {
+    color: #ffc107;
+}
+
+.power-critical {
+    color: #dc3545;
+}
+
+/* Recommendation boxes */
+.recommendation-box {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.5rem 0;
+}
+
+.recommendation-box h6 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.recommendation-item {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.recommendation-item:last-child {
+    border-bottom: none;
+}
+
+/* Component selection styling */
+.component-selector {
+    background: #fff;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    transition: all 0.3s ease;
+}
+
+.component-selector:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.1);
+}
+
+.component-selector.selected {
+    border-color: #28a745;
+    background-color: #f8fff9;
+}
+
+/* Status badges for compatibility */
+.status-compatible {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.status-warning {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: #212529;
+}
+
+.status-error {
+    background: linear-gradient(135deg, #dc3545, #e83e8c);
+    color: white;
+}
+
+/* Tooltips */
+.tooltip-info {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip-info::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s;
+    font-size: 0.8rem;
+    z-index: 1000;
+}
+
+.tooltip-info:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
