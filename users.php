@@ -166,7 +166,7 @@ $users = $db->fetchAll("
            COUNT(DISTINCT al2.id) as total_activities
     FROM users u 
     LEFT JOIN (
-        SELECT user_id, MAX(timestamp) as last_activity 
+        SELECT user_id, MAX(created_at) as last_activity 
         FROM activity_log 
         GROUP BY user_id
     ) al ON u.id = al.user_id

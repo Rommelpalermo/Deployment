@@ -46,13 +46,18 @@ class Database {
     // Update record
     public function update($table, $data, $where, $whereParams = []) {
         $setClause = [];
+        $paramIndex = 0;
+        
+        // Use positional parameters for SET clause
         foreach (array_keys($data) as $column) {
-            $setClause[] = "{$column} = :{$column}";
+            $setClause[] = "{$column} = ?";
         }
         $setClause = implode(', ', $setClause);
         
         $sql = "UPDATE {$table} SET {$setClause} WHERE {$where}";
-        $params = array_merge($data, $whereParams);
+        
+        // Merge data values with where parameters
+        $params = array_merge(array_values($data), $whereParams);
         
         return $this->query($sql, $params);
     }
